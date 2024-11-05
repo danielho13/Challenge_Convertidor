@@ -1,21 +1,45 @@
 package com.aluracursos.convertidor.modelos;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Scanner;
 
 public class Datos {
-    private static final String API_URL = "https://v6.exchangerate-api.com/v6/ad2f2ff5ceadfe9c89430bc4/latest/USD";
+    private String apiKey;
 
-    public String obtenerTasas() throws Exception {
-        HttpClient cliente = HttpClient.newHttpClient();
-        HttpRequest solicitud = HttpRequest.newBuilder()
-                .uri(URI.create(API_URL))
-                .build();
+    public Datos(String apiKey) {
+        this.apiKey = apiKey;
+    }
 
-        HttpResponse<String> respuesta = cliente.send(solicitud, HttpResponse.BodyHandlers.ofString());
-        return respuesta.body();
+    public double obtenerTasa(String monedaOrigen, String monedaDestino) {
+        String urlStr = String.format("https://v6.exchangerate-api.com/v6/%s/latest/%s", apiKey, monedaOrigen);
+
+        try {
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.connect();
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != 200) throw new RuntimeException("HttpResponseCode: " + responseCode);
+
+            Scanner scanner = new Scanner(url.openStream());
+            StringBuilder jsonStr = new StringBuilder();
+            while (scanner.hasNext()) jsonStr.append(scanner.nextLine());
+            scanner.close();
+
+            JsonObject jsonObject = JsonParser.parseString(jsonStr.toString()).getAsJsonObject();
+            JsonObject conversionRates = jsonObject.getAsJsonObject("conversion_rates");
+
+            return conversionRates.get(monedaDestino).getAsDouble();
+        } catch (IOException e) {
+            System.out.println("Error al obtener la tasa de conversión.");
+            return -1;
+        }
     }
 }
+
